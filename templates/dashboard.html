@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDS Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <main class="shell">
+        <div class="ambient-grid" aria-hidden="true"></div>
+        <section class="hero">
+            <div class="hero-topline">
+                <span class="eyebrow">Security Monitoring Demo</span>
+                <div class="live-ribbon">
+                    <span class="live-dot"></span>
+                    <span>Live Monitoring</span>
+                    <span class="muted">Updated every 5 seconds</span>
+                </div>
+            </div>
+            <h1>Intrusion Detection System Dashboard</h1>
+            <p class="hero-copy">
+                This dashboard parses authentication logs, detects brute-force behavior,
+                flags successful logins at suspicious hours, identifies successful access after repeated failures,
+                and enriches alerts with geolocation context when an API key is available.
+            </p>
+            <div class="keyline">
+                <span>Background refresh: every 5 seconds.</span>
+                <span>Geolocation API key: <code id="geo-status">{{ geo_status }}</code></span>
+                <span>Console time: <strong id="live-clock">--:--:--</strong></span>
+            </div>
+        </section>
+
+        <section class="panel simulator-panel">
+            <div class="simulator-header">
+                <div>
+                    <h2>Simulate Attack</h2>
+                    <p class="muted">
+                        Use these controlled presets to append demo events into <code>logs/auth.log</code>.
+                        If you do not provide a custom IP or choose your own detected IP, the app uses a predefined
+                        source IP for the selected simulation.
+                    </p>
+                </div>
+                <form method="post" action="{{ url_for('simulate_attack', simulation_name='reset') }}">
+                    <button class="sim-button reset-button" type="submit">Reset Demo Log</button>
+                </form>
+            </div>
+
+            {% if simulation_message %}
+                <div class="sim-message">{{ simulation_message }}</div>
+            {% endif %}
+
+            <form method="post" action="{{ url_for('simulate_attack', simulation_name='shared') }}">
+                <div class="sim-controls">
+                    <div class="sim-toggle">
+                        <span class="muted">
+                            Detected client IP: <code>{{ client_ip }}</code>
+                        </span>
+                        <span class="muted">
+                            Choose one shared source option below and then click any simulation card.
+                        </span>
+                    </div>
+                    <label class="sim-check">
+                        <input type="checkbox" name="use_client_ip" value="true">
+                        <span>Use my IP for this simulation</span>
+                    </label>
+                    <label class="sim-input">
+                        <span class="muted">Or enter a custom IP</span>
+                        <input type="text" name="custom_ip" placeholder="8.8.8.8">
+                    </label>
+                </div>
+
+                <div class="simulation-grid">
+                    {% for simulation_name, simulation in simulation_presets.items() %}
+                        <div class="simulation-card">
+                        <h3>{{ simulation.label }}</h3>
+                        <p class="muted">{{ simulation.description }}</p>
+                            <button class="sim-button" type="submit" formaction="{{ url_for('simulate_attack', simulation_name=simulation_name) }}">{{ simulation.label }}</button>
+                        </div>
+                    {% endfor %}
+                </div>
+            </form>
+        </section>
+
+        <section class="stats">
+            <article class="stat">
+                <div class="label">Parsed Events</div>
+                <div class="value" data-counter="{{ stats.total_logs }}" data-stat-key="total_logs">0</div>
+                <div class="stat-bar"><span style="width: 100%;"></span></div>
+            </article>
+            <article class="stat">
+                <div class="label">Active Alerts</div>
+                <div class="value" data-counter="{{ stats.total_alerts }}" data-stat-key="total_alerts">0</div>
+                <div class="stat-bar danger-bar">
+                    <span data-bar="alerts" style="width: {{ (stats.total_alerts / (stats.total_logs or 1) * 100)|round(0, 'ceil') }}%;"></span>
+                </div>
+            </article>
+            <article class="stat">
+                <div class="label">Failed Logins</div>
+                <div class="value" data-counter="{{ stats.failures }}" data-stat-key="failures">0</div>
+                <div class="stat-bar warning-bar">
+                    <span data-bar="failures" style="width: {{ (stats.failures / (stats.total_logs or 1) * 100)|round(0, 'ceil') }}%;"></span>
+                </div>
+            </article>
+            <article class="stat">
+                <div class="label">Successful Logins</div>
+                <div class="value" data-counter="{{ stats.successes }}" data-stat-key="successes">0</div>
+                <div class="stat-bar success-bar">
+                    <span data-bar="successes" style="width: {{ (stats.successes / (stats.total_logs or 1) * 100)|round(0, 'ceil') }}%;"></span>
+                </div>
+            </article>
+        </section>
+
+        <section class="grid">
+            <div class="left">
+                <section class="panel">
+                    <div class="section-head">
+                        <div>
+                            <h2>Detected Alerts</h2>
+                            <p class="section-copy">Priority events generated by the current detection pipeline.</p>
+                        </div>
+                        <div class="panel-chip high" id="active-alerts-chip">{{ stats.total_alerts }} Active</div>
+                    </div>
+                    <div id="alerts-container">
+                    {% if alerts %}
+                        <div class="alert-list">
+                            {% for alert in alerts %}
+                                <article class="alert-card" style="animation-delay: {{ loop.index0 * 0.08 }}s;">
+                                    <div class="alert-head">
+                                        <div>
+                                            <h3>{{ alert.type }}</h3>
+                                            <div class="muted">{{ alert.summary }}</div>
+                                        </div>
+                                        <span class="badge {{ alert.severity }}">{{ alert.severity }}</span>
+                                    </div>
+                                    <div><strong>Source IP:</strong> {{ alert.ip }}</div>
+                                    <div><strong>First Seen:</strong> {{ alert.time }}</div>
+                                    <div><strong>Attempts:</strong> {{ alert.count }}</div>
+                                    <div><strong>Detection Window:</strong> {{ alert.time_window }}</div>
+                                    {% if alert.location %}
+                                        <div><strong>Location:</strong> {{ alert.location.city or "Unknown city" }}, {{ alert.location.country or "Unknown country" }}</div>
+                                        <div><strong>Network:</strong> {{ alert.location.organization or alert.location.isp or "Unknown network" }}</div>
+                                    {% else %}
+                                        <div class="muted">No geolocation enrichment available for this IP.</div>
+                                    {% endif %}
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty">No suspicious activity detected in the current log sample.</div>
+                    {% endif %}
+                    </div>
+                </section>
+            </div>
+
+            <div class="right">
+                <section class="panel">
+                    <div class="section-head">
+                        <div>
+                            <h2>Alert Stats</h2>
+                            <p class="section-copy">Current distribution of triggered alert types.</p>
+                        </div>
+                    </div>
+                    {% if stats.alert_types %}
+                        <div class="activity-list" id="detection-mix-container">
+                            {% for alert_type, total in stats.alert_types.items() %}
+                                <div class="activity-row">
+                                    <div class="mix-row">
+                                        <strong>{{ alert_type }}</strong>
+                                        <div class="muted">{{ total }} alert(s)</div>
+                                    </div>
+                                    <div class="mini-bar">
+                                        <span style="width: {{ (total / (stats.total_alerts or 1) * 100)|round(0, 'ceil') }}%;"></span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="muted" id="detection-mix-container">No alerts to summarize yet.</div>
+                    {% endif %}
+                </section>
+
+                <section class="panel">
+                    <div class="section-head">
+                        <div>
+                            <h2>Recent Log Activity</h2>
+                            <p class="section-copy">Newest authentication events entering the dashboard.</p>
+                        </div>
+                        <div class="panel-chip">Feed</div>
+                    </div>
+                    <div class="activity-list" id="recent-logs-container">
+                        {% for log in recent_logs %}
+                            <article class="activity-row" style="animation-delay: {{ loop.index0 * 0.06 }}s;">
+                                <div class="activity-head">
+                                    <strong>{{ log.ip }}</strong>
+                                    <span class="badge {{ log.status|lower }}">{{ log.status }}</span>
+                                </div>
+                                <div class="muted">{{ log.time.strftime("%Y-%m-%d %H:%M:%S") }}</div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+        </section>
+    </main>
+    <script>
+        const clockEl = document.getElementById("live-clock");
+        const alertsContainer = document.getElementById("alerts-container");
+        const recentLogsContainer = document.getElementById("recent-logs-container");
+        const geoStatus = document.getElementById("geo-status");
+        const activeAlertsChip = document.getElementById("active-alerts-chip");
+
+        const animateCounter = (node, target) => {
+            const startValue = Number(node.textContent || 0);
+            const duration = 450;
+            const start = performance.now();
+
+            const tick = (now) => {
+                const progress = Math.min((now - start) / duration, 1);
+                node.textContent = Math.round(startValue + ((target - startValue) * progress));
+                if (progress < 1) {
+                    requestAnimationFrame(tick);
+                }
+            };
+
+            requestAnimationFrame(tick);
+        };
+
+        const percentage = (value, total) => `${Math.ceil((value / (total || 1)) * 100)}%`;
+
+        const renderAlerts = (alerts) => {
+            if (!alerts.length) {
+                alertsContainer.innerHTML = '<div class="empty">No suspicious activity detected in the current log sample.</div>';
+                return;
+            }
+
+            alertsContainer.innerHTML = `
+                <div class="alert-list live-list">
+                    ${alerts.map((alert) => `
+                        <article class="alert-card live-updated">
+                            <div class="alert-head">
+                                <div>
+                                    <h3>${alert.type}</h3>
+                                    <div class="muted">${alert.summary}</div>
+                                </div>
+                                <span class="badge ${alert.severity}">${alert.severity}</span>
+                            </div>
+                            <div><strong>Source IP:</strong> ${alert.ip}</div>
+                            <div><strong>First Seen:</strong> ${alert.time}</div>
+                            <div><strong>Attempts:</strong> ${alert.count}</div>
+                            <div><strong>Detection Window:</strong> ${alert.time_window}</div>
+                            ${alert.location
+                                ? `<div><strong>Location:</strong> ${alert.location.city || "Unknown city"}, ${alert.location.country || "Unknown country"}</div>
+                                   <div><strong>Network:</strong> ${alert.location.organization || alert.location.isp || "Unknown network"}</div>`
+                                : '<div class="muted">No geolocation enrichment available for this IP.</div>'}
+                        </article>
+                    `).join("")}
+                </div>
+            `;
+        };
+
+        const renderDetectionMix = (stats) => {
+            const currentMixContainer = document.getElementById("detection-mix-container");
+            const entries = Object.entries(stats.alert_types || {});
+            if (!entries.length) {
+                currentMixContainer.outerHTML = '<div class="muted" id="detection-mix-container">No alerts to summarize yet.</div>';
+                return;
+            }
+
+            currentMixContainer.outerHTML = `
+                <div class="activity-list" id="detection-mix-container">
+                    ${entries.map(([alertType, total]) => `
+                        <div class="activity-row live-updated">
+                            <div class="mix-row">
+                                <strong>${alertType}</strong>
+                                <div class="muted">${total} alert(s)</div>
+                            </div>
+                            <div class="mini-bar">
+                                <span style="width: ${percentage(total, stats.total_alerts)};"></span>
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+        };
+
+        const renderRecentLogs = (logs) => {
+            recentLogsContainer.innerHTML = logs.map((log) => `
+                <article class="activity-row live-updated">
+                    <div class="activity-head">
+                        <strong>${log.ip}</strong>
+                        <span class="badge ${log.status.toLowerCase()}">${log.status}</span>
+                    </div>
+                    <div class="muted">${log.time}</div>
+                </article>
+            `).join("");
+        };
+
+        const applyDashboardData = (data) => {
+            document.querySelectorAll("[data-stat-key]").forEach((node) => {
+                const key = node.dataset.statKey;
+                const nextValue = Number(data.stats[key] || 0);
+                if (Number(node.textContent || 0) !== nextValue) {
+                    animateCounter(node, nextValue);
+                }
+            });
+
+            document.querySelector('[data-bar="alerts"]').style.width = percentage(data.stats.total_alerts, data.stats.total_logs);
+            document.querySelector('[data-bar="failures"]').style.width = percentage(data.stats.failures, data.stats.total_logs);
+            document.querySelector('[data-bar="successes"]').style.width = percentage(data.stats.successes, data.stats.total_logs);
+
+            activeAlertsChip.textContent = `${data.stats.total_alerts} Active`;
+            geoStatus.textContent = data.geo_status;
+            renderAlerts(data.alerts);
+            renderDetectionMix(data.stats);
+            renderRecentLogs(data.recent_logs);
+        };
+
+        let lastDashboardSignature = JSON.stringify({
+            alerts: {{ alerts|tojson }},
+            recent_logs: [
+                {% for log in recent_logs %}
+                {"time": "{{ log.time.strftime('%Y-%m-%d %H:%M:%S') }}", "status": "{{ log.status }}", "ip": "{{ log.ip }}"}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            stats: {{ stats|tojson }},
+            geo_status: {{ geo_status|tojson }}
+        });
+
+        if (clockEl) {
+            const updateClock = () => {
+                const now = new Date();
+                clockEl.textContent = now.toLocaleTimeString();
+            };
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        document.querySelectorAll("[data-counter]").forEach((node) => {
+            const target = Number(node.dataset.counter || 0);
+            const duration = 700;
+            const start = performance.now();
+
+            const tick = (now) => {
+                const progress = Math.min((now - start) / duration, 1);
+                node.textContent = Math.round(target * progress);
+                if (progress < 1) {
+                    requestAnimationFrame(tick);
+                }
+            };
+
+            requestAnimationFrame(tick);
+        });
+
+        const pollDashboard = async () => {
+            try {
+                const response = await fetch("/api/dashboard", { cache: "no-store" });
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+                const nextSignature = JSON.stringify(data);
+                if (nextSignature === lastDashboardSignature) {
+                    return;
+                }
+
+                lastDashboardSignature = nextSignature;
+                applyDashboardData(data);
+            } catch (error) {
+                console.error("Dashboard polling failed:", error);
+            }
+        };
+
+        setInterval(pollDashboard, 5000);
+    </script>
+</body>
+</html>
