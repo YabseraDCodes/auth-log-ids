@@ -181,4 +181,4 @@ This project is ready for Railway with Gunicorn.
 
 - `geolocation.py` now reads the API key from the `IPGEOLOCATION_API_KEY` environment variable, so no secret needs to be committed to GitHub.
 - The app writes simulated events into `logs/auth.log`, so the hosted version should be treated as a demo environment rather than a production IDS.
-- You can check the full working hosted at: web-production-7328e.up.railway.app
+- You can check the full working hosted at: https://web-production-7328e.up.railway.app/
