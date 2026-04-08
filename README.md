@@ -106,6 +106,20 @@ These are the main dashboard panels:
 - Alert Stats: a compact summary showing how many alerts came from each detection rule
 - Recent Log Activity: the newest parsed authentication events entering the dashboard, including whether each event was a `FAIL` or `SUCCESS`
 
+## Screenshots
+
+### Dashboard Overview
+<img width="1224" height="825" alt="Screenshot BBB" src="https://github.com/user-attachments/assets/84b5d6c2-bc31-46f3-a1fa-9ceb448b7f33" />
+
+
+<img width="1238" height="872" alt="Screenshot BBBB" src="https://github.com/user-attachments/assets/c7ded735-0fa3-4627-a010-6de2f51b6b22" />
+
+
+<img width="1283" height="824" alt="Screenshot 2026-04-09 021635" src="https://github.com/user-attachments/assets/a71896fe-52f8-46ab-a9bf-ea95a8b2fa82" />
+
+
+
+
 ## Run locally
 
 1. Create and activate a virtual environment.
@@ -167,3 +181,4 @@ This project is ready for Railway with Gunicorn.
 
 - `geolocation.py` now reads the API key from the `IPGEOLOCATION_API_KEY` environment variable, so no secret needs to be committed to GitHub.
 - The app writes simulated events into `logs/auth.log`, so the hosted version should be treated as a demo environment rather than a production IDS.
+- You can check the full working hosted at: web-production-7328e.up.railway.app
