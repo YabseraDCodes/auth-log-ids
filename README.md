@@ -109,15 +109,8 @@ These are the main dashboard panels:
 ## Screenshots
 
 ### Dashboard Overview
-<img width="1224" height="825" alt="Screenshot BBB" src="https://github.com/user-attachments/assets/84b5d6c2-bc31-46f3-a1fa-9ceb448b7f33" />
 
-
-<img width="1238" height="872" alt="Screenshot BBBB" src="https://github.com/user-attachments/assets/c7ded735-0fa3-4627-a010-6de2f51b6b22" />
-
-
-<img width="1283" height="824" alt="Screenshot 2026-04-09 021635" src="https://github.com/user-attachments/assets/a71896fe-52f8-46ab-a9bf-ea95a8b2fa82" />
-
-
+<img width="1350" height="2937" alt="web-production-7328e up railway app__message=Simulate+Login+At+Odd+Hours+added+to+the+demo+log+using+your+detected+IP_+196 189 18 92" src="https://github.com/user-attachments/assets/3f5ba2ac-20c9-4c47-9a4c-ce032391838d" />
 
 
 ## Run locally
